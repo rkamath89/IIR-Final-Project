@@ -265,7 +265,7 @@ public class IbmWatson {
 				BufferedReader br = new BufferedReader(new InputStreamReader(new FileInputStream(fname), "UTF-8"));
 				File fout = new File("output.txt");
 				FileOutputStream fos = new FileOutputStream(fout);
-				BufferedWriter bw = new BufferedWriter(new OutputStreamWriter(fos));
+				BufferedWriter bw = null;
 				boolean skip = false;
 
 				while((line = br.readLine()) != null) 
@@ -330,6 +330,7 @@ public class IbmWatson {
 	public static void main(String[] args) throws IOException, ParseException 
 	{
 		boolean isExit = false;
+		boolean indexExists = false;
 		boolean usingStandardAnalyzer=false,usingBM25Similarity =false;
 		int choice;
 		int useStandardAnalyzer=1,queryFormat=0;
@@ -349,9 +350,14 @@ public class IbmWatson {
 		{
 			usingBM25Similarity = true;
 		}
+		File directory = new File("index-directory");
+		if(directory.exists())
+		{
+			indexExists = true;
+		}
 		System.out.println("System is Using Standard Analyzer : "+usingStandardAnalyzer);
 		System.out.println("System is Using BM25Similiraty : "+usingBM25Similarity);
-	
+		System.out.println("Index Construction Required : "+!indexExists);
 		
 		Directory index = FSDirectory.open(new File("index-directory"));
 		IndexWriterConfig config = null;
@@ -376,14 +382,15 @@ public class IbmWatson {
 		String fileName = "questions.txt",line=null;
 		FileReader inFile = null;
 		BufferedReader br = null;
+		
+		
 
 		try
 		{
-			File directory = new File("index-directory");
-			if(!directory.exists())
+			if(!indexExists)
 			{
 				List<String> fileNames = new ArrayList<String>();
-				File[] files = new File("C:/Users/Rahul/Desktop/GitHub/JavaWorspce/IIRFinalProject/wiki/").listFiles();
+				File[] files = new File("C:/Users/Rahul/Desktop/GitHub/csc583-Information-Retrieval/IBMWatson/wiki/").listFiles();
 				for (File file : files) 
 				{
 					if (file.isFile() && file.getName().endsWith(".txt") && !file.getName().equals("output.txt")) 
@@ -398,6 +405,7 @@ public class IbmWatson {
 		}
 		catch(Exception e)
 		{
+			System.out.println(e.getMessage());
 			System.out.println("EXCEPTION WHILE Opening Index Directory");
 		}
 		// PARSING THE DOCUMENT SHOULD BE DONE BY NOW !!!
@@ -415,10 +423,11 @@ public class IbmWatson {
 		while(!isExit)
 		{
 			System.out.println();
-			System.out.println("1: Enter the Query and Search");
-			System.out.println("2: Evaluation based on consolidation of results based on Category and Query [DID NOT IMPROVE RESULTS]");
-			System.out.println("3: Evaluate Questions on My Imperfect System (This does not Use Category)");
+			System.out.println("1: Enter the Query and Search on Imprefect System");
+			System.out.println("2: Evaluate Questions on My Imperfect System (This does not Use Category)");
+			System.out.println("3: Enter the Query and Category to Search On Improved System");
 			System.out.println("4: Evaluate Questions on My Improvised System (This Uses Category)");
+			System.out.println("5: Evaluation based on consolidation of results based on Category and Query [DID NOT IMPROVE RESULTS]");
 			System.out.println("6: Exit");
 			System.out.println("Enter Your Choice :");
 			choice = input.nextInt();
@@ -452,75 +461,10 @@ public class IbmWatson {
 				}
 				break;
 			case 2:
-				System.out.println("Enter your Query");
-				querystr = input.nextLine();
-				querystr = querystr.toLowerCase().replaceAll("\\p{Punct}+", "");
-				System.out.println("Enter Category");
-				categoryStr = input.nextLine();
-				categoryStr = categoryStr.toLowerCase().replaceAll("\\p{Punct}+", "");
-				collector = TopScoreDocCollector.create(50, true);
-
-				if(useStandardAnalyzer == 0)
-				{
-					q = new QueryParser(Version.LUCENE_40, "CONTENTS", whiteAnalyzer).parse(querystr);
-				}
-				else
-				{
-					q = new QueryParser(Version.LUCENE_40, "CONTENTS", analyzer).parse(querystr);
-				}
-				Query categoryQuery = null;
-				if(useStandardAnalyzer == 0)
-				{
-					categoryQuery = new QueryParser(Version.LUCENE_40, "CATEGORY", whiteAnalyzer).parse(categoryStr);
-				}
-				else
-				{
-					categoryQuery = new QueryParser(Version.LUCENE_40, "CATEGORY", analyzer).parse(categoryStr);
-				}
-
-				searcher.search(categoryQuery, collector);
-				ScoreDoc[] hitsCategory = collector.topDocs().scoreDocs;
-				LinkedHashMap<String,MyDocument> mapOfCategoryDocs = new LinkedHashMap<String,MyDocument>();
-				IbmWatson watson = new IbmWatson();
-				for(int i=0;i<hitsCategory.length;++i) 
-				{
-					int docId = hitsCategory[i].doc;
-					float score = hitsCategory[i].score;
-					Document d = searcher.doc(docId);
-
-					MyDocument myDoc = watson.new MyDocument(d,score);
-					String result = (i + 1) + ". " + d.get("TITLE") + "\t" + score;
-					mapOfCategoryDocs.put(d.get("TITLE"), myDoc);
-					System.out.println(result);
-				}
-				System.out.println("----");
-				collector = TopScoreDocCollector.create(50, true);
-				searcher.search(q, collector);
-				ScoreDoc[] hitsQuery = collector.topDocs().scoreDocs;
-				LinkedHashMap<String,MyDocument> mapOfContentDocs = new LinkedHashMap<String,MyDocument>();
-				for(int i=0;i<hitsQuery.length;++i) 
-				{
-					int docId = hitsQuery[i].doc;
-					float score = hitsQuery[i].score;
-					Document d = searcher.doc(docId);
-					MyDocument myDoc = watson.new MyDocument(d,score);
-					String result = (i + 1) + ". " + d.get("TITLE") + "\t" + score;
-					mapOfContentDocs.put(d.get("TITLE"), myDoc);
-					System.out.println(result);
-				}
-				SortedMap<Float,Document> sortedContent = consolidateTheResultsFromCategoryAndContent(mapOfCategoryDocs,mapOfContentDocs);
-				System.out.println("----------------");
-				Set<Float> key = sortedContent.keySet();
-				int k=0;
-				for(Float scor:key)
-				{
-					Document d = sortedContent.get(scor);
-					String result = (k + 1) + ". " + d.get("TITLE") + "\t" + scor;
-					System.out.println(result);
-				}
-				break;
-			case 3: 
 				// Question Evaluation
+				File foutNormal = new File("ResultsAtPos1NormalSystem.txt");
+				FileOutputStream fosNormal = new FileOutputStream(foutNormal);
+				BufferedWriter bwNormal = new BufferedWriter(new OutputStreamWriter(fosNormal));
 				hitsWithinRange = 0;
 				_COUNTWITHIN_ = 0;
 				lineNumber = 1;
@@ -595,6 +539,10 @@ public class IbmWatson {
 						{
 							if((i+1) <=_COUNTWITHIN_)
 							{
+								bwNormal.write("Question: "+q1);
+								bwNormal.newLine();
+								bwNormal.write(result);
+								bwNormal.newLine();
 								hitsWithinRange++;
 							}
 							found = true;
@@ -603,16 +551,50 @@ public class IbmWatson {
 					}
 					if(!found)
 					{
-
+						
 					}
-
 				}
+				bwNormal.close();
 				System.out.println("Number of Hits in Top "+_COUNTWITHIN_+" :"+hitsWithinRange);
 				System.out.println("Done");
 				//END
 				break;
-			case 4:
+			case 3:
+				System.out.println("Enter your Query");
+				querystr = input.nextLine();
+				querystr = querystr.toLowerCase().replaceAll("\\p{Punct}+", "");
+				System.out.println("Enter Category");
+				categoryStr = input.nextLine();
+				categoryStr = categoryStr.toLowerCase().replaceAll("\\p{Punct}+", "");
+				querystr = querystr+" "+categoryStr;
+				Query improvedQ = null;
+				if(useStandardAnalyzer == 0)
+				{
+					improvedQ = new QueryParser(Version.LUCENE_40, "CONTENTS", whiteAnalyzer).parse(querystr);
+				}
+				else
+				{
+					improvedQ = new QueryParser(Version.LUCENE_40, "CONTENTS", analyzer).parse(querystr);
+				}
+				collector = TopScoreDocCollector.create(hitsPerPage, true);
+				searcher.search(improvedQ, collector);
+				ScoreDoc[] improvedHits = collector.topDocs().scoreDocs;
+				// 4. display results
+				for(int i=0;i<improvedHits.length;++i) 
+				{
+					int docId = improvedHits[i].doc;
+					float score = improvedHits[i].score;
+					Document d = searcher.doc(docId);
+					String result = (i + 1) + ". " + d.get("TITLE") + "\t" + score;
+					System.out.println(result);
+				}
+				break;
+			case 4: 
 				// Question Evaluation
+				File foutImproved = new File("ResultsAtPos1ImprovedSystem.txt");
+				FileOutputStream fosImproved = new FileOutputStream(foutImproved);
+				BufferedWriter bwImproved = new BufferedWriter(new OutputStreamWriter(fosImproved));
+				
 				hitsWithinRange = 0;
 				_COUNTWITHIN_ = 0;
 				lineNumber = 1;
@@ -662,7 +644,7 @@ public class IbmWatson {
 				for(String q1: keys1)
 				{
 					querystr = q1;
-					querystr = questionAnswersWithCategory.get(q1).get(0)+ " " +querystr ;
+					querystr = questionAnswersWithCategory.get(q1).get(0)+ " " +querystr ; // THis is basically Category + Question and search it on CONTENTS
 					querystr = querystr.toLowerCase().replaceAll("\\p{Punct}+", "");
 					collector = TopScoreDocCollector.create(hitsPerPage, true);
 					String [] fieldsMq = {"CONTENTS"};
@@ -690,6 +672,11 @@ public class IbmWatson {
 						{
 							if((i+1) <=_COUNTWITHIN_)
 							{
+
+								bwImproved.write("Question: "+q1);
+								bwImproved.newLine();
+								bwImproved.write(result);
+								bwImproved.newLine();
 								hitsWithinRange++;
 							}
 							found = true;
@@ -699,10 +686,79 @@ public class IbmWatson {
 					if(!found)
 					{
 					}
-
+					
 				}
+				bwImproved.close();
 				System.out.println("Number of Hits in Top "+_COUNTWITHIN_+" :"+hitsWithinRange);
 				System.out.println("Done");
+				break;
+			case 5:
+				System.out.println("Enter your Query");
+				querystr = input.nextLine();
+				querystr = querystr.toLowerCase().replaceAll("\\p{Punct}+", "");
+				System.out.println("Enter Category");
+				categoryStr = input.nextLine();
+				categoryStr = categoryStr.toLowerCase().replaceAll("\\p{Punct}+", "");
+				collector = TopScoreDocCollector.create(50, true);
+
+				if(useStandardAnalyzer == 0)
+				{
+					q = new QueryParser(Version.LUCENE_40, "CONTENTS", whiteAnalyzer).parse(querystr);
+				}
+				else
+				{
+					q = new QueryParser(Version.LUCENE_40, "CONTENTS", analyzer).parse(querystr);
+				}
+				Query categoryQuery = null;
+				if(useStandardAnalyzer == 0)
+				{
+					categoryQuery = new QueryParser(Version.LUCENE_40, "CATEGORY", whiteAnalyzer).parse(categoryStr);
+				}
+				else
+				{
+					categoryQuery = new QueryParser(Version.LUCENE_40, "CATEGORY", analyzer).parse(categoryStr);
+				}
+
+				searcher.search(categoryQuery, collector);
+				ScoreDoc[] hitsCategory = collector.topDocs().scoreDocs;
+				LinkedHashMap<String,MyDocument> mapOfCategoryDocs = new LinkedHashMap<String,MyDocument>();
+				IbmWatson watson = new IbmWatson();
+				for(int i=0;i<hitsCategory.length;++i) 
+				{
+					int docId = hitsCategory[i].doc;
+					float score = hitsCategory[i].score;
+					Document d = searcher.doc(docId);
+
+					MyDocument myDoc = watson.new MyDocument(d,score);
+					String result = (i + 1) + ". " + d.get("TITLE") + "\t" + score;
+					mapOfCategoryDocs.put(d.get("TITLE"), myDoc);
+					System.out.println(result);
+				}
+				System.out.println("----");
+				collector = TopScoreDocCollector.create(50, true);
+				searcher.search(q, collector);
+				ScoreDoc[] hitsQuery = collector.topDocs().scoreDocs;
+				LinkedHashMap<String,MyDocument> mapOfContentDocs = new LinkedHashMap<String,MyDocument>();
+				for(int i=0;i<hitsQuery.length;++i) 
+				{
+					int docId = hitsQuery[i].doc;
+					float score = hitsQuery[i].score;
+					Document d = searcher.doc(docId);
+					MyDocument myDoc = watson.new MyDocument(d,score);
+					String result = (i + 1) + ". " + d.get("TITLE") + "\t" + score;
+					mapOfContentDocs.put(d.get("TITLE"), myDoc);
+					System.out.println(result);
+				}
+				SortedMap<Float,Document> sortedContent = consolidateTheResultsFromCategoryAndContent(mapOfCategoryDocs,mapOfContentDocs);
+				System.out.println("----------------");
+				Set<Float> key = sortedContent.keySet();
+				int k=0;
+				for(Float scor:key)
+				{
+					Document d = sortedContent.get(scor);
+					String result = (k + 1) + ". " + d.get("TITLE") + "\t" + scor;
+					System.out.println(result);
+				}
 				break;
 			case 6:
 				isExit = true;
