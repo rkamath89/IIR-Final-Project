@@ -331,21 +331,19 @@ public class IbmWatson {
 	{
 		boolean isExit = false;
 		boolean indexExists = false;
-		boolean usingStandardAnalyzer=false,usingBM25Similarity =false;
-		int choice;
-		int useStandardAnalyzer=1,queryFormat=0;
-		queryFormat = Integer.valueOf(args[0]);
-		useStandardAnalyzer = Integer.valueOf(args[1]);
-		
 		Scanner input = new Scanner(System.in);
+		boolean usingBM25Similarity =false;
+		int choice;
+		int queryFormat=0;
+		queryFormat = Integer.valueOf(args[0]);
+		String typeOfAnalyzer= args[1]; // W- White Space Analyzer , D - Default(Standard Analyzer) , S -SnowBall Analyzer
+		
+		
 		String querystr = new String();
 		String categoryStr = new String();
 		StandardAnalyzer analyzer = new StandardAnalyzer(Version.LUCENE_40);
 		WhitespaceAnalyzer whiteAnalyzer = new WhitespaceAnalyzer(Version.LUCENE_40);
-		if(useStandardAnalyzer == 1)
-		{
-			usingStandardAnalyzer = true;
-		}
+		SnowballAnalyzer snowBall = new SnowballAnalyzer(Version.LUCENE_40, "English");
 		if(queryFormat == 1)
 		{
 			usingBM25Similarity = true;
@@ -355,19 +353,24 @@ public class IbmWatson {
 		{
 			indexExists = true;
 		}
-		System.out.println("System is Using Standard Analyzer : "+usingStandardAnalyzer);
+		System.out.println("System is Using Analyzer Of Type : "+typeOfAnalyzer);
 		System.out.println("System is Using BM25Similiraty : "+usingBM25Similarity);
 		System.out.println("Index Construction Required : "+!indexExists);
 		
 		Directory index = FSDirectory.open(new File("index-directory"));
 		IndexWriterConfig config = null;
-		if(useStandardAnalyzer == 0)
+		//https://lucene.apache.org/core/4_0_0/analyzers-common/overview-summary.html
+		if("W".equalsIgnoreCase(typeOfAnalyzer))
 		{
 			config = new IndexWriterConfig(Version.LUCENE_40, whiteAnalyzer);
 		}
+		else if("S".equalsIgnoreCase(typeOfAnalyzer))
+		{
+			config = new IndexWriterConfig(Version.LUCENE_40, snowBall);
+		}
 		else
 		{
-			config = new IndexWriterConfig(Version.LUCENE_40, analyzer);
+			config = new IndexWriterConfig(Version.LUCENE_40,analyzer );
 		}
 		if(queryFormat == 1)
 		{
@@ -440,15 +443,19 @@ public class IbmWatson {
 				querystr = input.nextLine();
 				querystr = querystr.toLowerCase().replaceAll("\\p{Punct}+", "");
 				collector = TopScoreDocCollector.create(hitsPerPage, true);
-				if(useStandardAnalyzer == 0)
+				if("W".equalsIgnoreCase(typeOfAnalyzer))
 				{
 					q = new QueryParser(Version.LUCENE_40, "CONTENTS", whiteAnalyzer).parse(querystr);
+				}
+				else if("S".equalsIgnoreCase(typeOfAnalyzer))
+				{
+					q = new QueryParser(Version.LUCENE_40, "CONTENTS", snowBall).parse(querystr);
 				}
 				else
 				{
 					q = new QueryParser(Version.LUCENE_40, "CONTENTS", analyzer).parse(querystr);
 				}
-				
+							
 				searcher.search(q, collector);
 				ScoreDoc[] hits = collector.topDocs().scoreDocs;
 				for(int i=0;i<hits.length;++i) 
@@ -516,9 +523,13 @@ public class IbmWatson {
 					querystr = q1;
 					querystr = querystr.toLowerCase().replaceAll("\\p{Punct}+", "");
 					collector = TopScoreDocCollector.create(hitsPerPage, true);
-					if(useStandardAnalyzer == 0)
+					if("W".equalsIgnoreCase(typeOfAnalyzer))
 					{
 						q = new QueryParser(Version.LUCENE_40, "CONTENTS", whiteAnalyzer).parse(querystr);
+					}
+					else if("S".equalsIgnoreCase(typeOfAnalyzer))
+					{
+						q = new QueryParser(Version.LUCENE_40, "CONTENTS", snowBall).parse(querystr);
 					}
 					else
 					{
@@ -568,9 +579,13 @@ public class IbmWatson {
 				categoryStr = categoryStr.toLowerCase().replaceAll("\\p{Punct}+", "");
 				querystr = querystr+" "+categoryStr;
 				Query improvedQ = null;
-				if(useStandardAnalyzer == 0)
+				if("W".equalsIgnoreCase(typeOfAnalyzer))
 				{
 					improvedQ = new QueryParser(Version.LUCENE_40, "CONTENTS", whiteAnalyzer).parse(querystr);
+				}
+				else if("S".equalsIgnoreCase(typeOfAnalyzer))
+				{
+					improvedQ = new QueryParser(Version.LUCENE_40, "CONTENTS", snowBall).parse(querystr);
 				}
 				else
 				{
@@ -649,15 +664,18 @@ public class IbmWatson {
 					collector = TopScoreDocCollector.create(hitsPerPage, true);
 					String [] fieldsMq = {"CONTENTS"};
 					Query mq = null;
-					if(useStandardAnalyzer == 0)
+					if("W".equalsIgnoreCase(typeOfAnalyzer))
 					{
 						mq = new MultiFieldQueryParser(Version.LUCENE_40, fieldsMq, whiteAnalyzer).parse(querystr);
+					}
+					else if("S".equalsIgnoreCase(typeOfAnalyzer))
+					{
+						mq = new MultiFieldQueryParser(Version.LUCENE_40, fieldsMq, snowBall).parse(querystr);
 					}
 					else
 					{
 						mq = new MultiFieldQueryParser(Version.LUCENE_40, fieldsMq, analyzer).parse(querystr);
 					}
-					
 					searcher.search(mq, collector);
 					ScoreDoc[] hitsTest = collector.topDocs().scoreDocs;
 					// 4. display results
@@ -701,24 +719,31 @@ public class IbmWatson {
 				categoryStr = categoryStr.toLowerCase().replaceAll("\\p{Punct}+", "");
 				collector = TopScoreDocCollector.create(50, true);
 
-				if(useStandardAnalyzer == 0)
+				if("W".equalsIgnoreCase(typeOfAnalyzer))
 				{
 					q = new QueryParser(Version.LUCENE_40, "CONTENTS", whiteAnalyzer).parse(querystr);
+				}
+				else if("S".equalsIgnoreCase(typeOfAnalyzer))
+				{
+					q = new QueryParser(Version.LUCENE_40, "CONTENTS", snowBall).parse(querystr);
 				}
 				else
 				{
 					q = new QueryParser(Version.LUCENE_40, "CONTENTS", analyzer).parse(querystr);
 				}
 				Query categoryQuery = null;
-				if(useStandardAnalyzer == 0)
+				if("W".equalsIgnoreCase(typeOfAnalyzer))
 				{
-					categoryQuery = new QueryParser(Version.LUCENE_40, "CATEGORY", whiteAnalyzer).parse(categoryStr);
+					categoryQuery = new QueryParser(Version.LUCENE_40, "CONTENTS", whiteAnalyzer).parse(querystr);
+				}
+				else if("S".equalsIgnoreCase(typeOfAnalyzer))
+				{
+					categoryQuery = new QueryParser(Version.LUCENE_40, "CONTENTS", snowBall).parse(querystr);
 				}
 				else
 				{
-					categoryQuery = new QueryParser(Version.LUCENE_40, "CATEGORY", analyzer).parse(categoryStr);
+					categoryQuery = new QueryParser(Version.LUCENE_40, "CONTENTS", analyzer).parse(querystr);
 				}
-
 				searcher.search(categoryQuery, collector);
 				ScoreDoc[] hitsCategory = collector.topDocs().scoreDocs;
 				LinkedHashMap<String,MyDocument> mapOfCategoryDocs = new LinkedHashMap<String,MyDocument>();
