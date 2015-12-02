@@ -71,6 +71,8 @@ public class IbmWatson {
 	static StringBuffer title= null;//= new StringBuffer();
 	static StringBuffer category = null;//= new StringBuffer();
 	static StringBuffer contents = null;//= new StringBuffer();
+	static float _K1_ = (float) 0.2;
+	static float _B_ = (float) 0.3;
 	public static void setUpFlags()
 	{
 		_printCategory = true;
@@ -374,7 +376,7 @@ public class IbmWatson {
 		}
 		if(queryFormat == 1)
 		{
-			config.setSimilarity(new BM25Similarity());
+			config.setSimilarity(new BM25Similarity(_K1_,_B_));
 		}
 		IndexWriter w = new IndexWriter(index, config);
 		int _COUNTWITHIN_ ;
@@ -418,7 +420,7 @@ public class IbmWatson {
 		IndexSearcher searcher = new IndexSearcher(reader);
 		if(queryFormat == 1)
         {
-			searcher.setSimilarity(new BM25Similarity());
+			searcher.setSimilarity(new BM25Similarity(_K1_,_B_));
         }
 		TopScoreDocCollector collector ;//= TopScoreDocCollector.create(hitsPerPage, true);
 		// All This is Independant Of the Query Do it Once
@@ -649,7 +651,7 @@ public class IbmWatson {
 					}
 					else if(lineNumber == 3)
 					{
-						answer = new StringBuffer(line);
+						answer = new StringBuffer(line.toLowerCase());
 					}
 				}
 				br.close();
@@ -686,7 +688,7 @@ public class IbmWatson {
 						float score = hitsTest[i].score;
 						Document d = searcher.doc(docId);
 						String result = (i + 1) + ". " + d.get("TITLE") + "\t" + score;
-						if(d.get("TITLE").equalsIgnoreCase(questionAnswersWithCategory.get(q1).get(1)))
+						if(d.get("TITLE").matches(questionAnswersWithCategory.get(q1).get(1)))
 						{
 							if((i+1) <=_COUNTWITHIN_)
 							{
